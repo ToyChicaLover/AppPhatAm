@@ -1,1 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Luyện Phát Âm Anh Mỹ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 { color: #2c3e50; }
+        select, button {
+            font-size: 16px;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .text-display {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 8px;
+        }
+        .result-box {
+            margin-top: 20px;
+            text-align: left;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .score {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+        }
+        .high-score { color: #27ae60; }
+        .mid-score { color: #f39c12; }
+        .low-score { color: #c0392b; }
+        #status { font-style: italic; color: #7f8c8d; margin-top: 10px; }
+    </style>
+</head>
+<body>
 
+<div class="container">
+    <h1>Luyện Phát Âm (US English)</h1>
+    
+    <select id="exercise-select">
+        <option value="0">Bài 1: Nấu ăn (Từ vựng cơ bản)</option>
+        <option value="1">Bài 2: Hướng dẫn trên lớp (Giao tiếp)</option>
+        <option value="2">Bài 3: Mối quan hệ xã hội (Học thuật)</option>
+    </select>
+
+    <div class="text-display" id="target-text">
+        I usually fry the beef with some garlic and serve it with a fresh salad.
+    </div>
+
+    <button id="record-btn">🎤 Bắt đầu đọc</button>
+    <div id="status">Sẵn sàng...</div>
+
+    <div class="result-box" id="result-box">
+        <p><strong>Bạn đã nói:</strong> <span id="user-speech"></span></p>
+        <div class="score" id="score-display"></div>
+        <p id="feedback"></p>
+    </div>
+</div>
+
+<script>
+    // 3 Bài tập mẫu
+    const exercises = [
+        "I usually fry the beef with some garlic and serve it with a fresh salad.",
+        "Good morning class. Today we are going to learn about the importance of industrialization.",
+        "Developing strong relationships between the school, family, and society is essential for student success."
+    ];
+
+    const select = document.getElementById('exercise-select');
+    const targetText = document.getElementById('target-text');
+    const recordBtn = document.getElementById('record-btn');
+    const statusText = document.getElementById('status');
+    const resultBox = document.getElementById('result-box');
+    const userSpeech = document.getElementById('user-speech');
+    const scoreDisplay = document.getElementById('score-display');
+    const feedbackText = document.getElementById('feedback');
+
+    // Cập nhật câu hiển thị khi chọn bài
+    select.addEventListener('change', (e) => {
+        targetText.textContent = exercises[e.target.value];
+        resultBox.style.display = 'none';
+    });
+
+    // Khởi tạo Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        statusText.textContent = "Trình duyệt của bạn không hỗ trợ nhận dạng giọng nói. Vui lòng sử dụng Google Chrome.";
+        recordBtn.disabled = true;
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US'; // Chỉnh sang giọng Anh Mỹ
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recordBtn.addEventListener('click', () => {
+            recognition.start();
+            recordBtn.textContent = "Nghe đang...";
+            recordBtn.disabled = true;
+            statusText.textContent = "Hãy đọc to đoạn văn bản trên...";
+            resultBox.style.display = 'none';
+        });
+
+        recognition.onspeechend = () => {
+            recognition.stop();
+            recordBtn.textContent = "🎤 Bắt đầu đọc";
+            recordBtn.disabled = false;
+            statusText.textContent = "Đang xử lý...";
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            userSpeech.textContent = transcript;
+            
+            // Tính toán điểm số
+            const expected = targetText.textContent;
+            const score = calculateScore(expected, transcript);
+            
+            displayResult(score);
+            statusText.textContent = "Hoàn tất!";
+        };
+
+        recognition.onerror = (event) => {
+            recordBtn.textContent = "🎤 Bắt đầu đọc";
+            recordBtn.disabled = false;
+            statusText.textContent = "Lỗi nhận dạng: " + event.error;
+        };
+    }
+
+    // Hàm tính điểm dựa trên tỉ lệ khớp từ (Đơn giản hóa)
+    function calculateScore(expected, spoken) {
+        // Chuẩn hóa chuỗi: in thường, xóa dấu câu
+        const cleanExpected = expected.toLowerCase().replace(/[.,]/g, '').split(' ');
+        const cleanSpoken = spoken.toLowerCase().replace(/[.,]/g, '').split(' ');
+        
+        let matchCount = 0;
+        cleanExpected.forEach(word => {
+            if (cleanSpoken.includes(word)) {
+                matchCount++;
+                // Xóa từ đã khớp để tránh khớp đúp
+                cleanSpoken.splice(cleanSpoken.indexOf(word), 1);
+            }
+        });
+        
+        return Math.round((matchCount / cleanExpected.length) * 100);
+    }
+
+    // Hàm hiển thị kết quả
+    function displayResult(score) {
+        resultBox.style.display = 'block';
+        scoreDisplay.textContent = score + "/100";
+        scoreDisplay.className = 'score ' + (score >= 80 ? 'high-score' : (score >= 50 ? 'mid-score' : 'low-score'));
+        
+        if (score >= 90) {
+            feedbackText.textContent = "Tuyệt vời! Bạn phát âm rất chuẩn xác.";
+        } else if (score >= 70) {
+            feedbackText.textContent = "Khá tốt! Bạn phát âm rõ ràng, nhưng hãy chú ý nhấn âm và các phụ âm cuối.";
+        } else if (score >= 50) {
+            feedbackText.textContent = "Cần cố gắng hơn. Hãy nghe người bản xứ đọc và luyện tập lại.";
+        } else {
+            feedbackText.textContent = "Hệ thống chưa nghe rõ. Hãy đảm bảo không gian yên tĩnh và đọc to, rõ ràng hơn.";
+        }
+    }
+</script>
+
+</body>
+</html>
